@@ -10,21 +10,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
+#include <iostream>
 #include "kernels.h"
 
-void cudasafe(int error, char* message, char* file, int line) {
-	if (error != cudaSuccess) {
-		fprintf(stderr, "CUDA Error: %s : %i. In %s line %d\n", message, error,
-				file, line);
-		exit(-1);
+#ifndef EXP_BITS_SIZE
+#define EXP_BITS_SIZE 12
+#endif
+
+void vectors_gen(uint* h_vec, uint* h_b, int num_of_elements, int number_of_bits) {
+
+	for (int i = 0; i < num_of_elements; i++)
+	{
+		h_vec[i] = rand() % number_of_bits;
 	}
 }
 
-int getDeviceInformation() {
+void getDeviceInformation() {
 	cudaDeviceProp deviceProp;
 
-	cudasafe(cudaGetDeviceProperties(&deviceProp, 0),
-				"Get Device Properties", __FILE__, __LINE__);
+	cudaGetDeviceProperties(&deviceProp, 0);
 
 	if (deviceProp.major == 9999 && deviceProp.minor == 9999) {
 		printf("No CUDA GPU has been detected\n");
@@ -41,7 +45,15 @@ int main(int argc, char **argv) {
 
 	getDeviceInformation();
 
+	uint num_of_elements=1024;
+	uint mem_size_vec = sizeof(int) * num_of_elements;
+	uint *h_a = (uint *) malloc(mem_size_vec);
 
+	srand(time(NULL));
+	vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
+	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
+
+	kernel1(h_c, h_a, h_b, num_of_elements);
 
 	return 0;
 }
