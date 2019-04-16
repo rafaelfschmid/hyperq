@@ -13,7 +13,7 @@
 
 #include <cuda.h>
 
-extern "C" void kernel1(uint *h_vec, uint n);
+extern "C" void kernel1(uint *h_a, uint *h_b, uint *h_c, uint n);
 extern "C" void kernel2(uint *d_vec, uint n);
 extern "C" void kernel3(uint *d_vec, uint n);
 extern "C" void kernel4(uint *d_vec, uint n);

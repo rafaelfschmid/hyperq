@@ -17,7 +17,7 @@
 #define EXP_BITS_SIZE 12
 #endif
 
-void vectors_gen(uint* h_vec, uint* h_b, int num_of_elements, int number_of_bits) {
+void vectors_gen(uint* h_vec, int num_of_elements, int number_of_bits) {
 
 	for (int i = 0; i < num_of_elements; i++)
 	{
@@ -45,15 +45,17 @@ int main(int argc, char **argv) {
 
 	getDeviceInformation();
 
-	uint num_of_elements=1024;
+	uint num_of_elements=1048576;
 	uint mem_size_vec = sizeof(int) * num_of_elements;
 	uint *h_a = (uint *) malloc(mem_size_vec);
+	uint *h_b = (uint *) malloc(mem_size_vec);
+	uint *h_c = (uint *) malloc(mem_size_vec);
 
 	srand(time(NULL));
-	vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
 	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
+	vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
 
-	kernel1(h_c, h_a, h_b, num_of_elements);
+	kernel1(h_a, h_b, h_c, num_of_elements);
 
 	return 0;
 }
