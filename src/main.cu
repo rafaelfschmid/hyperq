@@ -10,20 +10,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
-#include <iostream>
 #include "kernels.h"
+#include <functional>
+#include <iostream>
+#include <vector>
+#include<tuple>
+#include <future>
 
-#ifndef EXP_BITS_SIZE
-#define EXP_BITS_SIZE 12
-#endif
-
-void vectors_gen(uint* h_vec, int num_of_elements, int number_of_bits) {
-
-	for (int i = 0; i < num_of_elements; i++)
-	{
-		h_vec[i] = rand() % number_of_bits;
-	}
-}
+using namespace std;
+using namespace std::placeholders;
 
 void getDeviceInformation() {
 	cudaDeviceProp deviceProp;
@@ -41,21 +36,100 @@ void getDeviceInformation() {
 	}
 }
 
+//cudaStream_t streams[NUM_STREAMS];
+
+class Scheduler {
+	std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t), uint, uint, uint, uint>> functions;
+	std::vector<int> map;
+	int i=0;
+
+public:
+	cudaStream_t *streams;
+	int num_streams;
+
+	Scheduler(int num_streams){
+		this->num_streams = num_streams;
+		streams = new cudaStream_t[num_streams];
+		for (int i = 0; i < this->num_streams; i++) {
+			cudaStreamCreate(&streams[i]);
+		}
+	}
+
+	template<typename Func>
+	void kernelCall(Func func, uint num_threads, uint num_blocks, uint shared_size, uint computation) {
+		auto funct = make_tuple(func, num_threads, num_blocks, shared_size, computation);
+		functions.push_back(funct);
+		map.push_back(-1);
+	}
+
+	void schedule(){
+		int k = 0;
+		int j = 0;
+		for(auto funct : functions){
+			//printf("k=%d ", k);
+			map[j++] = k;
+			k=(++k) % num_streams;
+		}
+	}
+
+	void execute(){
+		int k = 0;
+
+		for(auto f : functions){
+			//printf("\nk=%d", k);
+			std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
+			k++;
+		}
+	}
+};
+
+
 int main(int argc, char **argv) {
 
 	getDeviceInformation();
 
-	uint num_of_elements=1048576;
-	uint mem_size_vec = sizeof(int) * num_of_elements;
-	uint *h_a = (uint *) malloc(mem_size_vec);
-	uint *h_b = (uint *) malloc(mem_size_vec);
-	uint *h_c = (uint *) malloc(mem_size_vec);
+	Scheduler s(4);
 
-	srand(time(NULL));
-	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
-	vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
+	uint num_threads = 128;
+	uint num_blocks = 32;
+	uint shared_size = 64;
+	uint computation = 1024;
 
-	kernel1(h_a, h_b, h_c, num_of_elements);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
+	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
+	s.schedule();
+	s.execute();
+
 
 	return 0;
 }

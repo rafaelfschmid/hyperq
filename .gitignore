@@ -8,6 +8,8 @@ Consideracoes.ods
 *.in
 *.o
 *~
+*.nvvp
+*.nvprof
 /Debug/
 .cproject
 .project

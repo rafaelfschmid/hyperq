@@ -13,13 +13,19 @@
 
 #include <cuda.h>
 
-extern "C" void kernel1(uint *h_a, uint *h_b, uint *h_c, uint n);
-extern "C" void kernel2(uint *d_vec, uint n);
-extern "C" void kernel3(uint *d_vec, uint n);
-extern "C" void kernel4(uint *d_vec, uint n);
-extern "C" void kernel5(uint *d_vec, uint n);
-extern "C" void kernel6(uint *d_vec, uint n);
-extern "C" void kernel7(uint *d_vec, uint n);
-extern "C" void kernel8(uint *d_vec, uint n);
-extern "C" void kernel9(uint *d_vec, uint n);
-extern "C" void kernel10(uint *d_vec, uint n);
+#ifndef EXP_BITS_SIZE
+#define EXP_BITS_SIZE 12
+#endif
+
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 128
+#endif
+
+#ifndef NUM_STREAMS
+#define NUM_STREAMS 16
+#endif
+
+//extern "C" void kernel1(uint *h_a, uint *h_b, uint *h_c, uint num_threads, uint num_blocks, uint shared_size, uint computation, cudaStream_t stream);
+extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size, uint computation, cudaStream_t stream);
+extern "C" void kernel2(uint *h_a, uint *h_b, uint *h_c, uint n, cudaStream_t stream);
+

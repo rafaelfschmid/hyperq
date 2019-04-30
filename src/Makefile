@@ -9,12 +9,13 @@ all: build
 build: main.exe
 
 kernels.o: kernels.cu
-	nvcc -dc $(arch) -o $@ -c $<
+	nvcc -dc $(arch) -o $@ -c $< -std=c++11
 
 main.o: main.cu
-	nvcc -dc $(arch) -o $@ -c $<
+	nvcc -dc $(arch) -o $@ -c $< -std=c++11
 
 main.exe: kernels.o main.o
 	nvcc $(arch) $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcuda -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
 
-
+clean:
+	rm *.o *.exe
