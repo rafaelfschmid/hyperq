@@ -10,15 +10,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
-#include "kernels.h"
-#include <functional>
+#include <cuda_profiler_api.h>
 #include <iostream>
 #include <vector>
-#include<tuple>
 #include <future>
-
-using namespace std;
-using namespace std::placeholders;
 
 void getDeviceInformation() {
 	cudaDeviceProp deviceProp;
@@ -38,48 +33,36 @@ void getDeviceInformation() {
 
 //cudaStream_t streams[NUM_STREAMS];
 
+void exec(const char* s){
+	system(s);
+}
+
 class Scheduler {
-	std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t), uint, uint, uint, uint>> functions;
+	std::vector<std::string> programs;
 	std::vector<int> map;
 	int i=0;
 
 public:
-	cudaStream_t *streams;
-	int num_streams;
-
-	Scheduler(int num_streams){
-		this->num_streams = num_streams;
-		streams = new cudaStream_t[num_streams];
-		for (int i = 0; i < this->num_streams; i++) {
-			cudaStreamCreate(&streams[i]);
-		}
+	Scheduler(){
 	}
 
-	template<typename Func>
-	void kernelCall(Func func, uint num_threads, uint num_blocks, uint shared_size, uint computation) {
-		auto funct = make_tuple(func, num_threads, num_blocks, shared_size, computation);
-		functions.push_back(funct);
+	void programCall(std::string str) {
+		programs.push_back(str);
 		map.push_back(-1);
 	}
 
 	void schedule(){
-		int k = 0;
-		int j = 0;
-		for(auto funct : functions){
-			//printf("k=%d ", k);
-			map[j++] = k;
-			k=(++k) % num_streams;
-		}
+
 	}
 
-	void execute(){
-		int k = 0;
 
-		for(auto f : functions){
-			//printf("\nk=%d", k);
-			std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
-			k++;
+
+	void execute(){
+		cudaProfilerStart();
+		for(auto f : programs){
+			std::async(std::launch::async, exec, f.data());
 		}
+		cudaProfilerStop();
 	}
 };
 
@@ -88,46 +71,16 @@ int main(int argc, char **argv) {
 
 	getDeviceInformation();
 
-	Scheduler s(4);
+	Scheduler s;
+	//const char* str =
+	std::string str = "./hotspot 1024 2 2 ../../data/hotspot/temp_1024 ../../data/hotspot/power_1024 output.out";
+	//str.data()
 
-	uint num_threads = 128;
-	uint num_blocks = 32;
-	uint shared_size = 64;
-	uint computation = 1024;
-
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*8);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*4);
-	s.kernelCall(kernel1, num_threads, num_blocks, shared_size*2, computation*16);
-	s.schedule();
+	s.programCall(str);
+	s.programCall(str);
+	s.programCall(str);
+	s.programCall(str);
+//	s.schedule();
 	s.execute();
 
 
