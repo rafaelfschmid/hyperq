@@ -72,17 +72,16 @@ int main(int argc, char **argv) {
 	getDeviceInformation();
 
 	Scheduler s;
-	//const char* str =
-	std::string str = "./hotspot 1024 2 2 ../../data/hotspot/temp_1024 ../../data/hotspot/power_1024 output.out";
-	//str.data()
 
-	s.programCall(str);
-	s.programCall(str);
-	s.programCall(str);
-	s.programCall(str);
-//	s.schedule();
-	s.execute();
-
+	std::string line = "";
+	while(line != " ") {
+		std::getline (std::cin, line);
+		std::cout << line << "\n";
+		//std::string str = argv[i];//"./hotspot 1024 2 2 ../../data/hotspot/temp_1024 ../../data/hotspot/power_1024 output.out";
+		s.programCall(line);
+	//	s.schedule();
+		s.execute();
+	}
 
 	return 0;
 }
