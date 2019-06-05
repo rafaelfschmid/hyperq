@@ -37,15 +37,15 @@ void* MyLoadProc(my_lib_t hMyLib, const char* szMyProc) {
 	return dlsym(hMyLib, szMyProc);
 }
 
-typedef bool (*scheduleKernels_t)(int);
+typedef bool (*scheduleKernels_t)(int, int);
 my_lib_t hMyLib = NULL;
 scheduleKernels_t scheduleKernels = NULL;
 
-bool callcudahook(int n) {
+bool callcudahook(int n, int streams) {
   if (!(hMyLib = MyLoadLib("/home/rafael/cuda-workspace/hyperq/src/libcudahook.so"))) { /*error*/ }
   if (!(scheduleKernels = (scheduleKernels_t)MyLoadProc(hMyLib, "scheduleKernels"))) { /*error*/ }
 
-  bool ret = scheduleKernels(n);
+  bool ret = scheduleKernels(n, streams);
 
   MyUnloadLib(hMyLib);
 
@@ -74,7 +74,8 @@ void getDeviceInformation() {
 //cudaStream_t streams[NUM_STREAMS];
 
 class Scheduler {
-	std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t), uint, uint, uint, uint>> functions;
+	std::vector<std::tuple<void (*)(uint, uint, uint, uint), uint, uint, uint, uint>> functions;
+	//std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t), uint, uint, uint, uint>> functions;
 	std::vector<int> map;
 	int i=0;
 
@@ -109,41 +110,21 @@ public:
 
 	void execute(){
 		int k = 0;
+		std::vector<std::future<void>> vec;
+		for(auto f : functions){
+			printf("testando0.0\n");
+			//vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
+			vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f)));
+			k++;
+		}
 
-		//while(true) {
-		//std::vector<std::thread> vec;
-			std::vector<std::future<void>> vec;
-			for(auto f : functions){
-				//printf("\nk=%d", k);
-				//auto a = std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
-				vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
-				//vec.push_back(std::thread(get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
-				k++;
-			}
-			//functions.clear();
-
-			printf("testando0.1\n");
-			callcudahook(vec.size());
-			/*while(true){
-				if (callcudahook(vec.size()))
-					break;
-			}*/
-
-			printf("testando0.2\n");
-			for(k = 0; k < vec.size(); k++){
-				//printf("\nk=%d", k);
-				//std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
-				//vec[k].join();
-				vec[k].get();
-				//printf("testando0.11\n");
-				k++;
-			}
-
-		//}
-		//printf("testando0.2\n");
-
-		//executeKernels();
-		//cudaLaunch(NULL);
+		printf("testando0.1\n");
+		callcudahook(vec.size(), num_streams);
+		printf("testando0.2\n");
+		for(k = 0; k < vec.size(); k++){
+			vec[k].get();
+			k++;
+		}
 	}
 };
 
@@ -154,7 +135,7 @@ int main(int argc, char **argv) {
 
 	getDeviceInformation();
 
-	Scheduler s(4);
+	Scheduler s(8);
 	//callcudahook();
 
 
@@ -163,8 +144,10 @@ int main(int argc, char **argv) {
 	uint shared_size = 16;
 	uint computation = 2;
 
-	for(int i = 0; i < 5; i++) {
-		s.kernelCall(kernel1, num_threads*i, num_blocks*i*2, shared_size*i, computation*i*1000);
+	int j = 1;
+	for(int i = 1; i < 64; i++) {
+		j = (j+1)%32+1;
+		s.kernelCall(kernel1, num_threads*j, num_blocks*j*2, shared_size*j, computation*j*1000);
 	}
 
 	s.schedule();

@@ -8,13 +8,19 @@
 
 typedef struct {
 	const char* entry;
+	dim3 gridDim;
+	dim3 blockDim;
 	int numOfBlocks;
 	int numOfThreads;
 	int numOfRegisters;
-	int sharedMemory;
+	int sharedDynamicMemory;
+	int sharedStaticMemory;
 	int computationalTime;
+	cudaStream_t stream;
 	bool start = false;
 	std::list<void *> args;
+
+
 } kernelInfo_t;
 
 kernelInfo_t &kernelInfo() {

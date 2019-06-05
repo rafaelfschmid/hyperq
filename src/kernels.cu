@@ -50,7 +50,7 @@ __global__ void kernel_base(uint *d_a, uint *d_b, uint *d_c, uint n,
 	}
 }
 
-extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
+extern "C" void kernel3(uint num_threads, uint num_blocks, uint shared_size,
 		uint computation, cudaStream_t stream) {
 
 	uint num_of_elements = num_threads * num_blocks;
@@ -59,8 +59,8 @@ extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
 	uint *h_b = (uint *) malloc(mem_size_vec);
 	uint *h_c = (uint *) malloc(mem_size_vec);
 
-	srand (time(NULL));vectors_gen
-	(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
+	srand (time(NULL));
+	vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
 	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
 	vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
 
@@ -85,6 +85,51 @@ extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
 	//printf("Kernel1\n");
 
 	cudaMemcpyAsync(h_a, d_a, mem_size, cudaMemcpyDeviceToHost, stream);
+
+	cudaFree(d_a);
+	cudaFree(d_b);
+	cudaFree(d_c);
+	free(h_a);
+	free(h_b);
+	free(h_c);
+//print(h_a, n);
+}
+
+extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
+		uint computation) {
+
+	uint num_of_elements = num_threads * num_blocks;
+	uint mem_size_vec = sizeof(uint) * num_of_elements;
+	uint *h_a = (uint *) malloc(mem_size_vec);
+	uint *h_b = (uint *) malloc(mem_size_vec);
+	uint *h_c = (uint *) malloc(mem_size_vec);
+
+	srand (time(NULL));
+	vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
+	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
+	vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
+
+	int n = num_threads * num_blocks;
+	uint mem_size = sizeof(uint) * n;
+
+	uint *d_a, *d_b, *d_c;
+	cudaMalloc((void **) &d_a, mem_size);
+	cudaMalloc((void **) &d_b, mem_size);
+	cudaMalloc((void **) &d_c, mem_size);
+
+//print(h_b, n);
+	cudaMemcpyAsync(d_a, h_b, mem_size, cudaMemcpyHostToDevice);
+	cudaMemcpyAsync(d_b, h_b, mem_size, cudaMemcpyHostToDevice);
+	cudaMemcpyAsync(d_c, h_c, mem_size, cudaMemcpyHostToDevice);
+
+//dim3 dimBlock(BLOCK_SIZE);
+//dim3 dimGrid((n - 1) / dimBlock.x + 1);
+
+	kernel_base<<<num_blocks, num_threads, shared_size * (sizeof(uint))>>>(
+			d_a, d_b, d_c, n, computation);
+	//printf("Kernel1\n");
+
+	cudaMemcpyAsync(h_a, d_a, mem_size, cudaMemcpyDeviceToHost);
 
 	cudaFree(d_a);
 	cudaFree(d_b);
