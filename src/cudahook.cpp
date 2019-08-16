@@ -5,10 +5,10 @@
 
 #define DEBUG 0
 
-typedef cudaError_t (*cudaFuncGetAttributes_t)(struct cudaFuncAttributes *,	const void *);
+typedef cudaError_enum (*cudaFuncGetAttributes_t)(struct cudaFuncAttributes *,	const void *);
 static cudaFuncGetAttributes_t realCudaFuncGetAttributes = NULL;
 
-extern "C" cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *func) {
+extern "C" cudaError_enum cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *func) {
 
 	if (realCudaFuncGetAttributes == NULL)
 		realCudaFuncGetAttributes = (cudaFuncGetAttributes_t) dlsym(RTLD_NEXT,
@@ -19,10 +19,10 @@ extern "C" cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, co
 	return realCudaFuncGetAttributes(attr, func);
 }
 
-typedef cudaError_t (*cudaGetDeviceProperties_t)(struct cudaDeviceProp *prop, int device);
+typedef cudaError_enum (*cudaGetDeviceProperties_t)(struct cudaDeviceProp *prop, int device);
 static cudaGetDeviceProperties_t realCudaGetDeviceProperties = NULL;
 
-extern "C" cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop,	int device) {
+extern "C" cudaError_enum cudaGetDeviceProperties(struct cudaDeviceProp *prop,	int device) {
 
 	if (realCudaGetDeviceProperties == NULL)
 		realCudaGetDeviceProperties = (cudaGetDeviceProperties_t) dlsym(RTLD_NEXT, "cudaGetDeviceProperties");
@@ -51,10 +51,10 @@ void printDevices() {
 	}
 }
 
-typedef cudaError_t (*cudaConfigureCall_t)(dim3, dim3, size_t, cudaStream_t);
+typedef cudaError_enum (*cudaConfigureCall_t)(dim3, dim3, size_t, cudaStream_t);
 static cudaConfigureCall_t realCudaConfigureCall = NULL;
 
-extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, cudaStream_t stream = 0) {
+extern "C" cudaError_enum cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, cudaStream_t stream = 0) {
 	if(DEBUG)
 		printf("TESTE 1\n");
 
@@ -71,10 +71,10 @@ extern "C" cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sha
 
 }
 
-typedef cudaError_t (*cudaLaunch_t)(const char *);
+typedef cudaError_enum (*cudaLaunch_t)(const char *);
 static cudaLaunch_t realCudaLaunch = NULL;
 
-extern "C" cudaError_t cudaLaunch(const char *entry) {
+extern "C" cudaError_enum cudaLaunch(const char *entry) {
 
 	printf("Testando - CudaLaunch\n");
 	bip::managed_shared_memory segment(bip::open_only, "shared_memory");
@@ -108,7 +108,7 @@ extern "C" cudaError_t cudaLaunch(const char *entry) {
 	assert(realCudaLaunch != NULL && "cudaLaunch is null");
 
 	//auto start = std::chrono::high_resolution_clock::now();
-	cudaError_t ret = realCudaLaunch(entry);
+	cudaError_enum ret = realCudaLaunch(entry);
 
 
 	return ret;
