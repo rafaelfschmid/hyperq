@@ -31,6 +31,7 @@
 #include <signal.h>
 #include <string.h>
 
+/*
 #ifdef CUDA10
 #define cudaStream_t CUstream_st;
 #define cudaError_t cudaError_enum;
@@ -47,7 +48,7 @@
 #define cuLaunch cudaLaunch_t;
 //typedef Y cudaSetupArgument_t;
 #endif
-
+*/
 namespace bip = boost::interprocess;
 
 typedef struct {
@@ -60,7 +61,7 @@ typedef struct {
 	int numOfRegisters;
 	int sharedDynamicMemory;
 	int sharedStaticMemory;
-	cudaStream_t stream;
+	CUstream_st* stream;
 	float milliseconds;
 	bool start = false;
 } kernelInfo_t;
