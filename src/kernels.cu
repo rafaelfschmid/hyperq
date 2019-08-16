@@ -44,7 +44,7 @@ __global__ void kernel_base(uint *d_a, uint *d_b, uint *d_c, uint n,
 	}
 }
 
-extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
+extern "C" void kernel3(uint num_threads, uint num_blocks, uint shared_size,
 		uint computation, cudaStream_t stream) {
 
 	uint num_of_elements = num_threads * num_blocks;

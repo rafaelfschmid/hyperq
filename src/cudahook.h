@@ -31,6 +31,22 @@
 #include <signal.h>
 #include <string.h>
 
+#ifdef CUDA10
+typedef CUstream_st cudaStream_t;
+typedef cudaError_enum cudaError_t;
+typedef cuEventCreate cudaEventCreate_t;
+typedef cuEventRecord cudaEventRecord_t;
+typedef cuEventSynchronize cudaEventSynchronize_t;
+typedef cuEventElapsedTime cudaEventElapsedTime_t;
+typedef cuFuncGetAttribute cudaFuncGetAttributes_t;
+typedef cuDeviceGetProperties cudaGetDeviceProperties_t;
+typedef cuStreamCreate cudaStreamCreate_t;
+typedef cuMemFree_v2 cudaFree_t;
+// typedef X cudaConfigureCall_t;
+typedef cuLaunch cudaLaunch_t;
+//typedef Y cudaSetupArgument_t;
+#endif
+
 namespace bip = boost::interprocess;
 
 typedef struct {

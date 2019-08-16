@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
 		uint computation = rand() % 10;
 
 		printf("threads=%d ---- blocks=%d ---- shared_size=%d ---- comput=%d\n", num_threads, num_blocks, shared_size, computation);
-		s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*(i+1));
+		s.kernelCall(kernel3, num_threads, num_blocks, shared_size, computation*(i+1));
 	}
 
 	s.schedule();
