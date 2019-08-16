@@ -33,19 +33,13 @@ __global__ void kernel_base(uint *d_a, uint *d_b, uint *d_c, uint n,
 	// Make sure we do not go out of bounds
 	if (id < n) {
 		for (int i = 0; i < computation; i++) {
-			int a = d_b[id] + d_c[id];
-			a *= i;
-			int b = d_a[id] - d_b[id] - d_c[id];
-			b *= i;
-			d_a[id] = (a + b) / i;
-		}
-
-		for (int i = 0; i < computation; i++) {
-			int a = d_b[id] + d_c[id];
-			a *= i;
-			int b = d_a[id] - d_b[id] - d_c[id];
-			b *= i;
-			d_a[id] = (a + b) / i;
+			for (int j = 0; j < computation; j++) {
+				int a = d_b[id] + d_c[id];
+				a *= j;
+				int b = d_a[id] - d_b[id] - d_c[id];
+				b *= j;
+				d_a[id] = (a + b) / j;
+			}
 		}
 	}
 }
@@ -59,8 +53,8 @@ extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
 	uint *h_b = (uint *) malloc(mem_size_vec);
 	uint *h_c = (uint *) malloc(mem_size_vec);
 
-	srand (time(NULL));vectors_gen
-	(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
+	srand (time(NULL));
+	vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
 	vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
 	vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
 
@@ -73,9 +67,12 @@ extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
 	cudaMalloc((void **) &d_c, mem_size);
 
 //print(h_b, n);
-	cudaMemcpyAsync(d_a, h_b, mem_size, cudaMemcpyHostToDevice, stream);
+	/*cudaMemcpyAsync(d_a, h_b, mem_size, cudaMemcpyHostToDevice, stream);
 	cudaMemcpyAsync(d_b, h_b, mem_size, cudaMemcpyHostToDevice, stream);
-	cudaMemcpyAsync(d_c, h_c, mem_size, cudaMemcpyHostToDevice, stream);
+	cudaMemcpyAsync(d_c, h_c, mem_size, cudaMemcpyHostToDevice, stream);*/
+	cudaMemcpy(d_a, h_b, mem_size, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_b, h_b, mem_size, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_c, h_c, mem_size, cudaMemcpyHostToDevice);
 
 //dim3 dimBlock(BLOCK_SIZE);
 //dim3 dimGrid((n - 1) / dimBlock.x + 1);
@@ -84,7 +81,8 @@ extern "C" void kernel1(uint num_threads, uint num_blocks, uint shared_size,
 			d_a, d_b, d_c, n, computation);
 	//printf("Kernel1\n");
 
-	cudaMemcpyAsync(h_a, d_a, mem_size, cudaMemcpyDeviceToHost, stream);
+	//cudaMemcpyAsync(h_a, d_a, mem_size, cudaMemcpyDeviceToHost, stream);
+	cudaMemcpy(h_a, d_a, mem_size, cudaMemcpyDeviceToHost);
 
 	cudaFree(d_a);
 	cudaFree(d_b);

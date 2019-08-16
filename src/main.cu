@@ -22,35 +22,7 @@
 #include <future>
 
 #include <thread>
-
-typedef void* my_lib_t;
-
-my_lib_t MyLoadLib(const char* szMyLib) {
-	return dlopen(szMyLib, RTLD_LAZY);
-}
-
-void MyUnloadLib(my_lib_t hMyLib) {
-	dlclose(hMyLib);
-}
-
-void* MyLoadProc(my_lib_t hMyLib, const char* szMyProc) {
-	return dlsym(hMyLib, szMyProc);
-}
-
-typedef bool (*scheduleKernels_t)(int);
-my_lib_t hMyLib = NULL;
-scheduleKernels_t scheduleKernels = NULL;
-
-bool callcudahook(int n) {
-  if (!(hMyLib = MyLoadLib("/home/rafael/cuda-workspace/hyperq/src/libcudahook.so"))) { /*error*/ }
-  if (!(scheduleKernels = (scheduleKernels_t)MyLoadProc(hMyLib, "scheduleKernels"))) { /*error*/ }
-
-  bool ret = scheduleKernels(n);
-
-  MyUnloadLib(hMyLib);
-
-  return ret;
-}
+#include <omp.h>
 
 using namespace std;
 using namespace std::placeholders;
@@ -107,72 +79,252 @@ public:
 		}
 	}
 
-	void execute(){
+	void execute1(){
+		bip::managed_shared_memory segment(bip::open_only, "shared_memory");
+		SharedVector* kernels2 = segment.find<SharedVector>("Kernels2").first;
+
+		int k = 0;
+		for(auto f : functions){
+			cudaEvent_t start, stop;
+			cudaEventCreate(&start);
+			cudaEventCreate(&stop);
+
+			cudaEventRecord(start);
+			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t());
+			cudaEventRecord(stop);
+			cudaEventSynchronize(stop);
+
+			float milliseconds = 0;
+			cudaEventElapsedTime(&milliseconds, start, stop);
+			//std::cout << milliseconds << "\n";*/
+			(*kernels2)[k].milliseconds = milliseconds;
+			k++;
+		}
+
+	}
+
+	void execute2(){
 		int k = 0;
 
-		//while(true) {
-		//std::vector<std::thread> vec;
-			std::vector<std::future<void>> vec;
-			for(auto f : functions){
-				//printf("\nk=%d", k);
-				//auto a = std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
-				vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
-				//vec.push_back(std::thread(get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
-				k++;
-			}
-			//functions.clear();
+		std::vector<std::future<void>> vec;
+		for(auto f : functions){
+			//vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
+			vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t()));
+			k++;
+		}
 
-			printf("testando0.1\n");
-			callcudahook(vec.size());
-			/*while(true){
-				if (callcudahook(vec.size()))
-					break;
-			}*/
-
-			printf("testando0.2\n");
-			for(k = 0; k < vec.size(); k++){
-				//printf("\nk=%d", k);
-				//std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
-				//vec[k].join();
-				vec[k].get();
-				//printf("testando0.11\n");
-				k++;
-			}
-
-		//}
-		//printf("testando0.2\n");
-
-		//executeKernels();
-		//cudaLaunch(NULL);
+		printf("testando0.2\n");
+		for(k = 0; k < vec.size(); k++){
+			printf("%s\n", get<0>(functions[k]));
+			vec[k].get();
+		}
 	}
+
+	void execute3(){
+
+		/*omp_set_num_threads(num_streams);
+		#pragma omp parallel
+		{
+			uint id = omp_get_thread_num(); //cpu_thread_id
+			for (int i = 0; i < functions.size(); i+=num_streams) {
+				uint k = i + id;
+				get<0>(functions[k])(get<1>(functions[k]),get<2>(functions[k]),get<3>(functions[k]),get<4>(functions[k]),streams[map[k]]);
+			}
+		}*/
+
+		int k = 0;
+		for(auto f : functions){
+			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
+			k++;
+		}
+
+	}
+
 };
-
-
-
 
 int main(int argc, char **argv) {
 
+	bip::shared_memory_object::remove("shared_memory");
+	bip::managed_shared_memory segment(boost::interprocess::create_only, "shared_memory", 65536);
+
+	// Index of threads
+	int *id = segment.construct<int>("Index")(-1);
+
+	SharedMap *kernels = segment.construct<SharedMap>("Kernels")( 3, boost::hash<ShmemString>(), std::equal_to<ShmemString>()
+	        , segment.get_allocator<SharedMap>());
+
+	SharedVector *kernels2 =  segment.construct<SharedVector>("Kernels2")(segment.get_allocator<SharedVector>()); //segment.get_segment_manager());
+
 	getDeviceInformation();
 
+
 	Scheduler s(4);
-	//callcudahook();
+
+	int number_of_kernels = 4;
+	int *max = segment.construct<int>("Max")(number_of_kernels);
 
 
-	uint num_threads = 16;
-	uint num_blocks = 2;
-	uint shared_size = 16;
-	uint computation = 2;
+	cudaDeviceProp deviceProp;
+	cudaGetDeviceProperties(&deviceProp, 0);
 
-	for(int i = 0; i < 5; i++) {
-		s.kernelCall(kernel1, num_threads*i, num_blocks*i*2, shared_size*i, computation*i*1000);
+	srand(time(NULL));
+	for(int i = 0; i < number_of_kernels; i++) {
+		uint num_threads = rand() % deviceProp.maxThreadsPerBlock;
+		uint num_blocks = rand() % deviceProp.maxGridSize[0];
+		uint shared_size = rand() % deviceProp.sharedMemPerBlock;
+		uint computation = rand() % 10;
+
+		printf("threads=%d ---- blocks=%d ---- shared_size=%d ---- comput=%d\n", num_threads, num_blocks, shared_size, computation);
+		s.kernelCall(kernel1, num_threads, num_blocks, shared_size, computation*(i+1));
 	}
 
 	s.schedule();
 	printf("testando0\n");
-	s.execute();
+	s.execute1();
 	printf("testando1\n");
+	s.execute3();
 	//callcudahook();
 	//printf("testando2\n");
 
+	std::cout << kernels->size() << "\n";
+	for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
+	{
+		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
+		std::cout << iter->second.id << " " << iter->first.data() << " " << iter->second.milliseconds << "\n";
+	}
+
+	for(SharedVector::iterator iter = kernels2->begin(); iter != kernels2->end(); iter++)
+	{
+		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
+		std::cout << iter->id << " " << iter->milliseconds << "\n";
+	}
+
+
 	return 0;
 }
+
+
+
+/*#include <stdio.h>
+#include <stdlib.h>
+//#include <cuda.h>
+//#include <cuda_profiler_api.h>
+#include <iostream>
+#include <fstream>
+
+#include <vector>
+#include <thread>
+#include <future>
+#include <string.h>
+
+#include <unistd.h>
+#include <dlfcn.h>
+#include <signal.h>
+
+#include "cudahook.h"
+
+void exec(const char* s){
+	system(s);
+}
+
+int main(int argc, char **argv) {
+
+	//printf("argc=%d", argc);
+
+	bip::shared_memory_object::remove("shared_memory");
+	bip::managed_shared_memory segment(boost::interprocess::create_only, "shared_memory", 65536);
+
+	// Index of threads
+	int *id = segment.construct<int>("Index")(-1);
+	// Shared map of kernels
+	//SharedMap *kernels =  segment.construct<SharedMap>("Kernels") (std::less<MapKey>() ,segment.get_segment_manager());
+
+
+	SharedMap *kernels = segment.construct<SharedMap>("Kernels")( 3, boost::hash<ShmemString>(), std::equal_to<ShmemString>()
+	        , segment.get_allocator<SharedMap>());
+
+
+
+	exec(line.data());
+
+	f_out << kernels->size() << "\n";
+	for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
+	{
+		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
+		f_out << iter->second.id << " " << iter->first.data() << " " << iter->second.microseconds << "\n";
+	}
+	//f_out << "\n";
+	f_out.close();
+	//callcudahook(2);
+
+	std::vector<std::future<void>> vec;
+	std::getline (std::cin, line1);
+	vec.push_back(std::async(std::launch::async,exec,line1.data()));
+
+	std::getline (std::cin, line2);
+	vec.push_back(std::async(std::launch::async,exec,line2.data()));
+
+	printf("começoooouuuu\n");
+	bool test = callcudahook(2, 2);
+	printf("acaboooouuuu\n");
+
+	vec[0].get();
+	vec[1].get();
+	vec[2].get();
+
+
+
+	bip::shared_memory_object::remove("shared_memory");
+
+	return 0;
+}*/
+
+
+/*std::vector<std::future<void>> vec;
+
+	std::string line1 = "";
+	std::string line2 = "";
+	std::string line3 = "";
+	std::string line4 = "";
+	std::string line5 = "";
+	std::string line6 = "";
+	std::string line7 = "";
+	std::string line8 = "";
+
+	std::getline (std::cin, line1);
+	std::getline (std::cin, line2);
+	std::getline (std::cin, line3);
+	std::getline (std::cin, line4);
+
+
+	std::vector<char*> commandVector;
+	commandVector.push_back(const_cast<char*>(line2.data()));
+	commandVector.push_back(const_cast<char*>(line3.data()));
+	commandVector.push_back(const_cast<char*>(line4.data()));
+	commandVector.push_back(NULL);
+	//const int status = execvp(commandVector[0], &commandVector[0]);
+	//exec(commandVector[0], commandVector);
+	myclass a(commandVector[0], commandVector);
+
+	std::vector<char*> commandVector2;
+	//commandVector2.push_back(const_cast<char*>(line1.data()));
+	std::getline (std::cin, line1);
+	std::getline (std::cin, line2);
+	std::getline (std::cin, line3);
+	std::getline (std::cin, line4);
+	std::getline (std::cin, line5);
+	std::getline (std::cin, line6);
+	std::getline (std::cin, line7);
+	std::getline (std::cin, line8);
+
+	commandVector2.push_back(const_cast<char*>(line2.data()));
+	commandVector2.push_back(const_cast<char*>(line3.data()));
+	commandVector2.push_back(const_cast<char*>(line4.data()));
+	commandVector2.push_back(const_cast<char*>(line5.data()));
+	commandVector2.push_back(const_cast<char*>(line6.data()));
+	commandVector2.push_back(const_cast<char*>(line7.data()));
+	commandVector2.push_back(const_cast<char*>(line8.data()));
+	commandVector2.push_back(NULL);
+	//const int status = execvp(commandVector[0], &commandVector[0]);
+	//exec(commandVector2[0], commandVector2);
+	myclass b(commandVector2[0], commandVector2);*/
