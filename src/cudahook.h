@@ -32,18 +32,19 @@
 #include <string.h>
 
 #ifdef CUDA10
-typedef CUstream_st cudaStream_t;
-typedef cudaError_enum cudaError_t;
-typedef cuEventCreate cudaEventCreate_t;
-typedef cuEventRecord cudaEventRecord_t;
-typedef cuEventSynchronize cudaEventSynchronize_t;
-typedef cuEventElapsedTime cudaEventElapsedTime_t;
-typedef cuFuncGetAttribute cudaFuncGetAttributes_t;
-typedef cuDeviceGetProperties cudaGetDeviceProperties_t;
-typedef cuStreamCreate cudaStreamCreate_t;
-typedef cuMemFree_v2 cudaFree_t;
+#define cudaStream_t CUstream_st;
+#define cudaError_t cudaError_enum;
+#define cudaEventCreate_t cuEventCreate;
+#define cudaEventRecord_t cuEventRecord;
+#define cudaEventSynchronize_t cuEventSynchronize;
+#define cudaEventElapsedTime_t cuEventElapsedTime;
+#define cudaFuncGetAttributes_t cuFuncGetAttribute;
+#define cudaGetDeviceProperties_t cuDeviceGetProperties;
+#define cudaStreamCreate_t cuStreamCreate;
+#define cudaFree_t cuMemFree_v2;
+#define cudaEvent_t cuEvent;
 // typedef X cudaConfigureCall_t;
-typedef cuLaunch cudaLaunch_t;
+#define cuLaunch cudaLaunch_t;
 //typedef Y cudaSetupArgument_t;
 #endif
 
