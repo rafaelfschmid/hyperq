@@ -3,7 +3,10 @@
 #include <stdlib.h>  /* exit */
 
 #include <list>
+
 #include <cuda.h>
+#include <driver_types.h>
+
 #include <vector_types.h>
 #include <vector>
 
