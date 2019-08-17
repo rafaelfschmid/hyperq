@@ -51,10 +51,10 @@ void printDevices() {
 	}
 }
 
-typedef cudaError_enum (*cudaConfigureCall_t)(dim3, dim3, size_t, cudaStream_t);
+typedef cudaError_enum (*cudaConfigureCall_t)(dim3, dim3, size_t, CUstream_st*);
 static cudaConfigureCall_t realCudaConfigureCall = NULL;
 
-extern "C" cudaError_enum cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, cudaStream_t stream = 0) {
+extern "C" cudaError_enum cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, CUstream_st* stream = 0) {
 	if(DEBUG)
 		printf("TESTE 1\n");
 

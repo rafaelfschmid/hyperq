@@ -167,7 +167,8 @@ int main(int argc, char **argv) {
 	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
 
-	srand(time(NULL));
+	//srand(time(NULL));
+	srand(0);
 	for(int i = 0; i < number_of_kernels; i++) {
 		uint num_threads = rand() % deviceProp.maxThreadsPerBlock;
 		uint num_blocks = rand() % deviceProp.maxGridSize[0];
