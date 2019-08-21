@@ -16,10 +16,10 @@ kernels.o: kernels.cu
 	nvcc -dc $(arch) -o $@ -c $< -std=c++11
 
 main.o: main.cu
-	nvcc -dc $(arch) -o $@ -c $< -std=c++11
+	nvcc -ccbin g++ -Xcompiler -fopenmp -dc $(arch) -o $@ -c $< -std=c++11
 
 main.exe: kernels.o main.o
-	nvcc -ccbin g++ -Xcompiler -fopenmp $(arch)  $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
+	nvcc -ccbin g++ -Xcompiler -fopenmp $(arch)  $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcuda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
 
 clean:
 	rm *.o *.exe *.so

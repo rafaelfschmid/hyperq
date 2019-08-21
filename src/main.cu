@@ -9,7 +9,9 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+
 #include <cuda.h>
+
 
 #include <dlfcn.h>
 #include "kernels.h"
@@ -46,21 +48,41 @@ void getDeviceInformation() {
 //cudaStream_t streams[NUM_STREAMS];
 
 class Scheduler {
-	std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t), uint, uint, uint, uint>> functions;
+	std::vector<std::tuple<void (*)(uint, uint, uint, uint, cudaStream_t, uint*, uint*, uint*), uint, uint, uint, uint>> functions;
 	std::vector<int> map;
 	int i=0;
+	uint *h_a, *h_b, *h_c;
 
 public:
 	cudaStream_t *streams;
 	int num_streams;
 
-	Scheduler(int num_streams){
+	Scheduler(int num_streams, int totalGlobalMemory){
 		this->num_streams = num_streams;
 		streams = new cudaStream_t[num_streams];
 		for (int i = 0; i < this->num_streams; i++) {
 			cudaStreamCreate(&streams[i]);
 		}
+
+		int num_of_elements = totalGlobalMemory/4/3;
+		int mem_size_vec = sizeof(uint) * num_of_elements;
+		h_a = (uint *) malloc(mem_size_vec);
+		h_b = (uint *) malloc(mem_size_vec);
+		h_c = (uint *) malloc(mem_size_vec);
+
+		srand (time(NULL));
+		vectors_gen(h_a, num_of_elements, pow(2, EXP_BITS_SIZE));
+		vectors_gen(h_b, num_of_elements, pow(2, EXP_BITS_SIZE));
+		vectors_gen(h_c, num_of_elements, pow(2, EXP_BITS_SIZE));
 	}
+
+	/*
+	 * ~Scheduler(){
+		free(h_a);
+		free(h_b);
+		free(h_c);
+	}
+	*/
 
 	template<typename Func>
 	void kernelCall(Func func, uint num_threads, uint num_blocks, uint shared_size, uint computation) {
@@ -90,7 +112,7 @@ public:
 			cudaEventCreate(&stop);
 
 			cudaEventRecord(start);
-			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t());
+			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t(), h_a, h_b, h_c);
 			cudaEventRecord(stop);
 			cudaEventSynchronize(stop);
 
@@ -108,8 +130,8 @@ public:
 
 		std::vector<std::future<void>> vec;
 		for(auto f : functions){
-			//vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]));
-			vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t()));
+			vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]], h_a, h_b, h_c));
+			//vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t()));
 			k++;
 		}
 
@@ -122,56 +144,66 @@ public:
 
 	void execute3(){
 
-		/*omp_set_num_threads(num_streams);
+		/*printf("num_streams=%d\n", num_streams);
+		omp_set_num_threads(num_streams);
 		#pragma omp parallel
 		{
 			uint id = omp_get_thread_num(); //cpu_thread_id
+			printf("id=%d\n", id);
 			for (int i = 0; i < functions.size(); i+=num_streams) {
 				uint k = i + id;
-				get<0>(functions[k])(get<1>(functions[k]),get<2>(functions[k]),get<3>(functions[k]),get<4>(functions[k]),streams[map[k]]);
+				printf("k=%d\n", k);
+				get<0>(functions[k])(get<1>(functions[k]),get<2>(functions[k]),get<3>(functions[k]),get<4>(functions[k]),streams[map[k]], h_a, h_b, h_c);
 			}
 		}*/
-
 		int k = 0;
 		for(auto f : functions){
-			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]]);
+			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]], h_a, h_b, h_c);
 			k++;
 		}
 
 	}
 
+	void vectors_gen(uint* h_vec, int num_of_elements, int number_of_bits) {
+
+		for (int i = 0; i < num_of_elements; i++) {
+			h_vec[i] = rand() % number_of_bits;
+		}
+	}
+
+
 };
+
+void exec(const char* s){
+	system(s);
+}
+
 
 int main(int argc, char **argv) {
 
 	bip::shared_memory_object::remove("shared_memory");
 	bip::managed_shared_memory segment(boost::interprocess::create_only, "shared_memory", 65536);
 
-	// Index of threads
-	int *id = segment.construct<int>("Index")(-1);
-
-	SharedMap *kernels = segment.construct<SharedMap>("Kernels")( 3, boost::hash<ShmemString>(), std::equal_to<ShmemString>()
-	        , segment.get_allocator<SharedMap>());
 
 	SharedVector *kernels2 =  segment.construct<SharedVector>("Kernels2")(segment.get_allocator<SharedVector>()); //segment.get_segment_manager());
 
-	getDeviceInformation();
-
-
-	Scheduler s(4);
+	// Index of threads
+	int *id = segment.construct<int>("Index")(-1);
 
 	int number_of_kernels = 4;
 	int *max = segment.construct<int>("Max")(number_of_kernels);
 
-
 	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
+
+	Scheduler s(4, deviceProp.totalGlobalMem);
+	//getDeviceInformation();
 
 	//srand(time(NULL));
 	srand(0);
 	for(int i = 0; i < number_of_kernels; i++) {
 		uint num_threads = rand() % deviceProp.maxThreadsPerBlock;
-		uint num_blocks = rand() % deviceProp.maxGridSize[0];
+		uint num_blocks = rand() % deviceProp.maxGridSize[1];
 		uint shared_size = rand() % deviceProp.sharedMemPerBlock;
 		uint computation = rand() % 10;
 
@@ -183,17 +215,12 @@ int main(int argc, char **argv) {
 	printf("testando0\n");
 	s.execute1();
 	printf("testando1\n");
+	exec("unset LD_PRELOAD");
 	s.execute3();
 	//callcudahook();
 	//printf("testando2\n");
 
-	std::cout << kernels->size() << "\n";
-	for(SharedMap::iterator iter = kernels->begin(); iter != kernels->end(); iter++)
-	{
-		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
-		std::cout << iter->second.id << " " << iter->first.data() << " " << iter->second.milliseconds << "\n";
-	}
-
+	std::cout << kernels2->size() << "\n";
 	for(SharedVector::iterator iter = kernels2->begin(); iter != kernels2->end(); iter++)
 	{
 		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
