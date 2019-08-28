@@ -7,7 +7,7 @@ COMMONFLAGS=-Wall -fPIC -shared -ldl
 
 all: build
 
-build: libcudahook.so main.exe
+build: libcudahook.so main.exe maingen.exe
 
 libcudahook.so: cudahook.cpp
 	g++ -I$(CUDA_HOME)/include $(COMMONFLAGS) -o libcudahook.so cudahook.cpp -std=c++11
@@ -18,8 +18,14 @@ kernels.o: kernels.cu
 main.o: main.cu
 	nvcc -ccbin g++ -Xcompiler -fopenmp -dc $(arch) -o $@ -c $< -std=c++11
 
-main.exe: kernels.o main.o
+maingen.o: maingen.cu
+	nvcc -ccbin g++ -Xcompiler -fopenmp -dc $(arch) -o $@ -c $< -std=c++11
+
+maingen.exe: kernels.o maingen.o
 	nvcc -ccbin g++ -Xcompiler -fopenmp $(arch)  $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcuda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS)
+
+main.exe: kernels.o main.o
+	nvcc -ccbin g++ -Xcompiler -fopenmp $(arch)  $+ -o $@ -I"../lib" -std=c++11 --expt-extended-lambda -lcuda -lcudart -DELAPSED_TIME=$(TIME) -DEXECUTIONS=$(EXECS) -lcuda
 
 clean:
 	rm *.o *.exe *.so

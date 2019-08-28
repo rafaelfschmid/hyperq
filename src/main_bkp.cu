@@ -26,8 +26,6 @@
 #include <thread>
 #include <omp.h>
 
-#include "cuda_profiler_api.h"
-
 using namespace std;
 using namespace std::placeholders;
 
@@ -104,60 +102,65 @@ public:
 	}
 
 	void execute1(){
+		bip::managed_shared_memory segment(bip::open_only, "shared_memory");
+		SharedVector* kernels2 = segment.find<SharedVector>("Kernels2").first;
 
-		cudaProfilerStart();
+		int k = 0;
+		for(auto f : functions){
+			cudaEvent_t start, stop;
+			cudaEventCreate(&start);
+			cudaEventCreate(&stop);
 
-		printf("num_streams=%d\n", num_streams);
-		omp_set_num_threads(num_streams);
-		#pragma omp parallel
-		{
-			uint id = omp_get_thread_num(); //cpu_thread_id
-			printf("id=%d\n", id);
-			uint s = 0;
-			for (int i = 0; i < functions.size(); i+=num_streams) {
-				uint k = i + id;
-				printf("k=%d\n", k);
-				get<0>(functions[k])(get<1>(functions[k]),get<2>(functions[k]),get<3>(functions[k]),get<4>(functions[k]),streams[s], h_a, h_b, h_c);
-				s = (s+1) % num_streams;
-			}
+			cudaEventRecord(start);
+			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t(), h_a, h_b, h_c);
+			cudaEventRecord(stop);
+			cudaEventSynchronize(stop);
+
+			float milliseconds = 0;
+			cudaEventElapsedTime(&milliseconds, start, stop);
+			//std::cout << milliseconds << "\n";*/
+			(*kernels2)[k].milliseconds = milliseconds;
+			k++;
 		}
-
-		cudaProfilerStop();
 
 	}
 
 	void execute2(){
 		int k = 0;
 
-		cudaProfilerStart();
 		std::vector<std::future<void>> vec;
 		for(auto f : functions){
 			vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]], h_a, h_b, h_c));
 			//vec.push_back(std::async(std::launch::async, get<0>(f),get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t()));
 			k++;
-			printf("k = %d\n", k);
 		}
 
+		printf("testando0.2\n");
 		for(k = 0; k < vec.size(); k++){
-			printf("k = %d\n", k);
+			printf("%s\n", get<0>(functions[k]));
 			vec[k].get();
 		}
-		cudaProfilerStop();
 	}
 
 	void execute3(){
 
-		cudaProfilerStart();
-
+		/*printf("num_streams=%d\n", num_streams);
+		omp_set_num_threads(num_streams);
+		#pragma omp parallel
+		{
+			uint id = omp_get_thread_num(); //cpu_thread_id
+			printf("id=%d\n", id);
+			for (int i = 0; i < functions.size(); i+=num_streams) {
+				uint k = i + id;
+				printf("k=%d\n", k);
+				get<0>(functions[k])(get<1>(functions[k]),get<2>(functions[k]),get<3>(functions[k]),get<4>(functions[k]),streams[map[k]], h_a, h_b, h_c);
+			}
+		}*/
 		int k = 0;
 		for(auto f : functions){
-			//std::cout << get<1>(f) << " " << get<2>(f) << " " << get<3>(f) << " " << get<4>(f) << "\n";
 			get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),streams[map[k]], h_a, h_b, h_c);
-			//get<0>(f)(get<1>(f),get<2>(f),get<3>(f),get<4>(f),cudaStream_t(), h_a, h_b, h_c);
 			k++;
 		}
-
-		cudaProfilerStop();
 
 	}
 
@@ -187,40 +190,42 @@ int main(int argc, char **argv) {
 	// Index of threads
 	int *id = segment.construct<int>("Index")(-1);
 
-	int number_of_kernels;
-	scanf("%d", &number_of_kernels);
+	int number_of_kernels = 32;
 	int *max = segment.construct<int>("Max")(number_of_kernels);
 
 	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
 
 	Scheduler s(4, deviceProp.totalGlobalMem);
+	//getDeviceInformation();
 
-	uint index, num_threads, num_blocks, shared_size, computation;
-	float milliseconds;
+	//srand(time(NULL));
+	srand(0);
 	for(int i = 0; i < number_of_kernels; i++) {
-		scanf("%d", &index);
-		scanf("%d", &num_threads);
-		scanf("%d", &num_blocks);
-		scanf("%d", &shared_size);
-		scanf("%d", &computation);
-		scanf("%f", &milliseconds);
+		uint num_threads = rand() % deviceProp.maxThreadsPerBlock;
+		uint num_blocks = rand() % deviceProp.maxGridSize[1];
+		uint shared_size = rand() % deviceProp.sharedMemPerBlock;
+		uint computation = rand() % 10;
 
-		//printf("index=%d -- threads=%d -- blocks=%d -- shared_size=%d -- comput=%d -- milliseconds=%f\n", index, num_threads, num_blocks, shared_size, computation, milliseconds);
-		s.kernelCall(kernel3, num_threads, num_blocks, shared_size, computation);
+		printf("threads=%d ---- blocks=%d ---- shared_size=%d ---- comput=%d\n", num_threads, num_blocks, shared_size, computation);
+		s.kernelCall(kernel3, num_threads, num_blocks, shared_size, computation*(i+1));
 	}
 
 	s.schedule();
+	printf("testando0\n");
 	s.execute1();
+	printf("testando1\n");
+	exec("unset LD_PRELOAD");
+	s.execute2();
 	//callcudahook();
 	//printf("testando2\n");
 
-	/*std::cout << kernels2->size() << "\n";
+	std::cout << kernels2->size() << "\n";
 	for(SharedVector::iterator iter = kernels2->begin(); iter != kernels2->end(); iter++)
 	{
 		//printf("%d %s %f\n", iter->second.id, iter->first.data(), iter->second.microseconds);
 		std::cout << iter->id << " " << iter->milliseconds << "\n";
-	}*/
+	}
 
 
 	return 0;

@@ -66,6 +66,7 @@ typedef struct {
 	int sharedStaticMemory;
 	CUstream_st* stream;
 	float milliseconds;
+	int computation;
 	bool start = false;
 } kernelInfo_t;
 

@@ -76,14 +76,14 @@ static cudaLaunch_t realCudaLaunch = NULL;
 
 extern "C" cudaError_enum cudaLaunch(const char *entry) {
 
-	printf("Testando - CudaLaunch\n");
+	//printf("Testando - CudaLaunch\n");
 	bip::managed_shared_memory segment(bip::open_only, "shared_memory");
 
 	int* 				index 	= segment.find<int>("Index").first;
 	int* 				numKernels 	= segment.find<int>("Max").first;
 
 	if(*index < ((*numKernels) - 1)) {
-		printf("index=%d --- numKernels=%d\n", *index, (*numKernels)-1);
+		//printf("index=%d --- numKernels=%d\n", *index, (*numKernels)-1);
 
 		SharedVector* 		kernels2 = segment.find<SharedVector>("Kernels2").first;
 

@@ -70,7 +70,7 @@ extern "C" void kernel3(uint num_threads, uint num_blocks, uint shared_size,
 //dim3 dimBlock(BLOCK_SIZE);
 //dim3 dimGrid((n - 1) / dimBlock.x + 1);
 
-	kernel_base<<<num_blocks, num_threads, shared_size * (sizeof(uint)), stream>>>(
+	kernel_base<<<num_blocks, num_threads, shared_size, stream>>>(
 			d_a, d_b, d_c, n, computation);
 
 	//printf("Kernel1\n");
